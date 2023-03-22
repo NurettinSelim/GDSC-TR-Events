@@ -35,7 +35,7 @@ module.exports.createEvent = function (eventData) {
 }
 
 
-module.exports.updateEvent = function (evenData) {
+module.exports.updateEvent = function (eventData) {
     const eventCal = {
         'summary': `${eventData.title}`,
         'description': `This event organized by ${eventData.chapter.title}<br><a href="${eventData.url}">Event Page</a>`,
