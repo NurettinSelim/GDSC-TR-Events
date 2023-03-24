@@ -26,10 +26,10 @@ module.exports.createEvent = function (eventData) {
     }, function (err, event) {
         if (err) {
             console.error('There was an error contacting the Calendar service: ' + err);
-            console.info('Event data was:' + JSON.stringify(eventCal));
+            console.info('Event data was:' + JSON.stringify(eventCal, null, 2));
             return;
         }
-        console.info('Event created: ' + JSON.stringify(event.data));
+        console.info('Event created: ' + JSON.stringify(event.data, null, 2));
     });
 
 }
@@ -55,10 +55,10 @@ module.exports.updateEvent = function (eventData) {
     }, function (err, event) {
         if (err) {
             console.error('There was an error contacting the Calendar service: ' + err);
-            console.info('Event data was:' + JSON.stringify(eventCal));
+            console.info('Event data was:' + JSON.stringify(eventCal, null, 2));
             return;
         }
-        console.info('Event updated: ' + JSON.stringify(event.data));
+        console.info('Event updated: ' + JSON.stringify(event.data, null, 2));
     });
 
 }
@@ -74,7 +74,7 @@ module.exports.deleteEvent = function (eventData) {
             console.info('Event data was:' + eventCal);
             return;
         }
-        console.info('Event deleted: ' + JSON.stringify(eventData));
+        console.info('Event deleted: ' + JSON.stringify(eventData, null, 2));
     });
 
 }
