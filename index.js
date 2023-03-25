@@ -13,6 +13,7 @@ exports.eventChecker = functions
     .runWith({ timeoutSeconds: 300 })
     .pubsub.schedule('0 0 * * *')
     .onRun(async (context) => {
+        
         const startDate = new Date(2023, 2, 1).toISOString().substring(0, 10);
         const endDate = new Date(Date.now() + 52 * 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
 
@@ -28,7 +29,7 @@ exports.eventChecker = functions
 
             var resp = await axios.get(data["links"]["next"]);
             var data = resp.data;
-            console.log(data["links"]["next"]);
+            functions.logger.debug(data["links"]["next"]);
 
 
             data["results"].forEach(function (event) {

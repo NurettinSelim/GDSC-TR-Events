@@ -1,4 +1,5 @@
 const { google } = require('googleapis');
+const logger = require("firebase-functions/logger");
 
 const auth = new google.auth.GoogleAuth({
     scopes: ['https://www.googleapis.com/auth/calendar'],
@@ -25,11 +26,11 @@ module.exports.createEvent = function (eventData) {
         resource: eventCal,
     }, function (err, event) {
         if (err) {
-            console.error('There was an error contacting the Calendar service: ' + err);
-            console.info('Event data was:' + JSON.stringify(eventCal, null, 2));
+            logger.error('There was an error contacting the Calendar service: ', err)
+            logger.info('Event data was:', eventCal)
             return;
         }
-        console.info('Event created: ' + JSON.stringify(event.data, null, 2));
+        logger.info('Event created: ', event.data);
     });
 
 }
@@ -54,11 +55,11 @@ module.exports.updateEvent = function (eventData) {
         resource: eventCal,
     }, function (err, event) {
         if (err) {
-            console.error('There was an error contacting the Calendar service: ' + err);
-            console.info('Event data was:' + JSON.stringify(eventCal, null, 2));
+            logger.error('There was an error contacting the Calendar service: ', err)
+            logger.info('Event data was:', eventCal)
             return;
         }
-        console.info('Event updated: ' + JSON.stringify(event.data, null, 2));
+        logger.info('Event updated: ', event.data);
     });
 
 }
@@ -70,11 +71,11 @@ module.exports.deleteEvent = function (eventData) {
         eventId: `${eventData.id}`,
     }, function (err, event) {
         if (err) {
-            console.error('There was an error contacting the Calendar service: ' + err);
-            console.info('Event data was:' + eventCal);
+            logger.error('There was an error contacting the Calendar service: ', err)
+            logger.info('Event data was:', eventData)
             return;
         }
-        console.info('Event deleted: ' + JSON.stringify(eventData, null, 2));
+        logger.info('Event deleted: ', eventData);
     });
 
 }
