@@ -85,6 +85,7 @@ exports.databaseOnUpdate = onDocumentUpdated("events/{eventId}", (event) => {
 
 exports.databaseOnDelete = onDocumentDeleted("events/{eventId}", (event) => {
     const deletedData = event.data.data();
-    deleteEvent(deletedData);
+    if (deletedData.isAddedToCalendar == true)
+        deleteEvent(deletedData);
     return null;
 })
