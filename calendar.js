@@ -2,7 +2,7 @@ const { google } = require('googleapis');
 const logger = require("firebase-functions/logger");
 const { defineString } = require('firebase-functions/params');
 
-const CALENDAR_ID = defineString('CALENDAR_ID').value();
+const CALENDAR_ID = defineString('CALENDAR_ID');
 
 const auth = new google.auth.GoogleAuth({
     scopes: ['https://www.googleapis.com/auth/calendar'],
@@ -24,13 +24,10 @@ module.exports.createEvent = function (eventData) {
             'timeZone': 'America/Los_Angeles',
         },
     };
-    logger.info({
-        calendarId: CALENDAR_ID,
-        resource: eventCal,
-    })
+
     return new Promise((resolve, reject) => {
         gcal.events.insert({
-            calendarId: CALENDAR_ID,
+            calendarId: CALENDAR_ID.value(),
             resource: eventCal,
         }, function (err, event) {
             if (err) {
@@ -60,7 +57,7 @@ module.exports.updateEvent = function (eventData) {
         },
     };
     gcal.events.update({
-        calendarId: CALENDAR_ID,
+        calendarId: CALENDAR_ID.value(),
         eventId: `${eventData.id}`,
         resource: eventCal,
     }, function (err, event) {
@@ -77,7 +74,7 @@ module.exports.updateEvent = function (eventData) {
 
 module.exports.deleteEvent = function (eventData) {
     gcal.events.delete({
-        calendarId: CALENDAR_ID,
+        calendarId: CALENDAR_ID.value(),
         eventId: `${eventData.id}`,
     }, function (err, event) {
         if (err) {
