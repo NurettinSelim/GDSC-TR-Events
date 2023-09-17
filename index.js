@@ -13,7 +13,7 @@ setGlobalOptions({ maxInstances: 5 })
 const db = getFirestore();
 const eventsCollection = db.collection("events");
 
-const startDate = new Date(2023, 9, 1).toISOString().substring(0, 10);
+const startDate = new Date(2023, 8, 1).toISOString().substring(0, 10);
 const endDate = new Date(Date.now() + 52 * 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
 
 const fetchEvents = async (context) => {
