@@ -8,7 +8,7 @@ const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require("fir
 const { createEvent, updateEvent, deleteEvent } = require("./calendar");
 
 initializeApp();
-setGlobalOptions({ maxInstances: 5 })
+setGlobalOptions({ maxInstances: 5 });
 
 const db = getFirestore();
 const eventsCollection = db.collection("events");
@@ -17,85 +17,108 @@ const startDate = new Date(2023, 8, 1).toISOString().substring(0, 10);
 const endDate = new Date(Date.now() + 52 * 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
 
 const fetchEvents = async (context) => {
-    var data = { "links": { "next": `https://gdsc.community.dev/api/event/?fields=id,chapter,title,status,start_date,end_date,url&status=Published&start_date=${startDate}&end_date=${endDate}` } };
+    try {
+        var data = { "links": { "next": `https://gdsc.community.dev/api/event/?fields=id,chapter,title,status,start_date,end_date,url&status=Published&start_date=${startDate}&end_date=${endDate}` } };
 
-    const savedIds = (await eventsCollection.get()).docs.map(function (doc) {
-        return doc.id;
-    });
+        const savedIds = (await eventsCollection.get()).docs.map(doc => doc.id);
+        const processedIds = new Set();
 
-    while (data["links"]["next"] != null) {
-        const batch = db.batch();
+        while (data["links"]["next"] != null) {
+            const batch = db.batch();
 
-        var resp = await get(data["links"]["next"]);
-        var data = resp.data;
-        logger.debug(data["links"]["next"]);
+            const resp = await get(data["links"]["next"]);
+            data = resp.data;
+            logger.debug(data["links"]["next"]);
 
-
-        data["results"].forEach(function (event) {
-            if (event["chapter"]["country"] == "TR") {
-                batch.set(eventsCollection.doc(event["id"].toString()), event)
-                if (savedIds.includes(event["id"].toString())) {
-                    savedIds.splice(savedIds.indexOf(event["id"].toString()), 1);
+            for (const event of data["results"]) {
+                if (event["chapter"]["country"] === "TR") {
+                    batch.set(eventsCollection.doc(event["id"].toString()), event);
+                    processedIds.add(event["id"].toString());
                 }
             }
+
+            await batch.commit();
+        }
+
+        // Delete events that no longer exist
+        const idsToDelete = savedIds.filter(id => !processedIds.has(id));
+        for (const id of idsToDelete) {
+            await eventsCollection.doc(id).delete();
+        }
+
+        return null;
+    } catch (error) {
+        logger.error('Error in fetchEvents:', error);
+        throw error;
+    }
+};
+
+const fetchEventsWithoutCalendar = async (context) => {
+    try {
+        const snapshot = await eventsCollection.where("isAddedToCalendar", "==", false).get();
+        const updatePromises = snapshot.docs.map(async (doc) => {
+            const eventData = doc.data();
+            try {
+                await createEvent(eventData);
+                await doc.ref.update({ isAddedToCalendar: true });
+            } catch (error) {
+                logger.error(`Failed to process event ${eventData.id}:`, error);
+            }
         });
-
-        await batch.commit();
+        await Promise.all(updatePromises);
+        return null;
+    } catch (error) {
+        logger.error('Error in fetchEventsWithoutCalendar:', error);
+        throw error;
     }
-    for (let i = 0; i < savedIds.length; i++) {
-        await eventsCollection.doc(savedIds[i]).delete();
-    }
-    return null;
-}
+};
 
-// fetch events that could not be added to the calendar due to error
-const fetchEventsWithoutCalendar = async (event) => {
-    const snapshot = await db.collection("events").where("isAddedToCalendar", "==", false).get()
-    snapshot.docs.map(async function (doc) {
-        const eventData = doc.data();
-        await createEvent(eventData);
-        await doc.ref.update({ isAddedToCalendar: true });
-    });
-    return null;
-}
+exports.eventChecker = onSchedule({ 
+    schedule: '0 0 * * *', 
+    timeoutSeconds: 300,
+    memory: '256MiB'
+}, fetchEvents);
 
-exports.eventChecker = onSchedule({ schedule: '0 0 * * *', timeoutSeconds: 300 }, fetchEvents)
-
-exports.eventWithoutCalenderChecker = onSchedule({ schedule: '0 12 * * *', timeoutSeconds: 300 }, fetchEventsWithoutCalendar)
+exports.eventWithoutCalenderChecker = onSchedule({ 
+    schedule: '0 12 * * *', 
+    timeoutSeconds: 300,
+    memory: '256MiB'
+}, fetchEventsWithoutCalendar);
 
 exports.databaseOnCreate = onDocumentCreated("events/{eventId}", async (event) => {
-    const eventData = event.data.data();
     try {
+        const eventData = event.data.data();
         await createEvent(eventData);
         await event.data.ref.update({ isAddedToCalendar: true });
-    } catch (e) {
-        logger.error(e);
+    } catch (error) {
+        logger.error('Error in databaseOnCreate:', error);
         await event.data.ref.update({ isAddedToCalendar: false });
     }
     return null;
-})
+});
 
 exports.databaseOnUpdate = onDocumentUpdated("events/{eventId}", async (event) => {
-    if (event.data.before.data().isAddedToCalendar == false && event.data.after.data().isAddedToCalendar == true) {
-        const newEventData = event.data.after.data();
-        try {
+    try {
+        if (event.data.before.data().isAddedToCalendar === false && 
+            event.data.after.data().isAddedToCalendar === true) {
+            const newEventData = event.data.after.data();
             await updateEvent(newEventData);
-        } catch (error) {
-            logger.error('Failed to update calendar event:', error);
-            await event.data.after.ref.update({ isAddedToCalendar: false });
         }
+    } catch (error) {
+        logger.error('Error in databaseOnUpdate:', error);
+        await event.data.after.ref.update({ isAddedToCalendar: false });
     }
     return null;
-})
+});
 
 exports.databaseOnDelete = onDocumentDeleted("events/{eventId}", async (event) => {
-    const deletedData = event.data.data();
-    if (deletedData.isAddedToCalendar == true) {
-        try {
+    try {
+        const deletedData = event.data.data();
+        if (deletedData.isAddedToCalendar === true) {
             await deleteEvent(deletedData);
-        } catch (error) {
-            logger.error('Failed to delete calendar event:', error);
         }
+    } catch (error) {
+        logger.error('Error in databaseOnDelete:', error);
     }
     return null;
-})
+});

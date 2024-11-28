@@ -1,5 +1,5 @@
 const { google } = require('googleapis');
-const logger = require("firebase-functions/logger");
+const { logger } = require("firebase-functions/v2");
 const { defineString } = require('firebase-functions/params');
 
 const CALENDAR_ID = defineString('CALENDAR_ID');
@@ -29,36 +29,30 @@ module.exports.createEvent = function (eventData) {
         gcal.events.insert({
             calendarId: CALENDAR_ID.value(),
             resource: eventCal,
-        }, function (err, event) {
-            if (err) {
-                if (err.code === 409) {
-                    logger.info('Event already exists, attempting to update instead');
-                    gcal.events.update({
-                        calendarId: CALENDAR_ID.value(),
-                        eventId: `${eventData.id}`,
-                        resource: eventCal,
-                    }, function (updateErr, updatedEvent) {
-                        if (updateErr) {
-                            logger.error('Failed to update existing event: ', updateErr);
-                            reject(updateErr);
-                            return;
-                        }
-                        logger.info('Successfully updated existing event: ', updatedEvent.data);
-                        resolve(updatedEvent.data);
-                    });
-                } else {
-                    logger.error('There was an error contacting the Calendar service: ', err);
-                    logger.info('Event data was:', eventCal);
-                    reject(err);
-                }
-                return;
-            }
+        }).then(event => {
             logger.info('Event created: ', event.data);
             resolve(event.data);
+        }).catch(err => {
+            if (err.code === 409) {
+                logger.info('Event already exists, attempting to update instead');
+                return gcal.events.update({
+                    calendarId: CALENDAR_ID.value(),
+                    eventId: `${eventData.id}`,
+                    resource: eventCal,
+                }).then(updatedEvent => {
+                    logger.info('Successfully updated existing event: ', updatedEvent.data);
+                    resolve(updatedEvent.data);
+                }).catch(updateErr => {
+                    logger.error('Failed to update existing event: ', updateErr);
+                    reject(updateErr);
+                });
+            }
+            logger.error('There was an error contacting the Calendar service: ', err);
+            logger.info('Event data was:', eventCal);
+            reject(err);
         });
     });
 }
-
 
 module.exports.updateEvent = function (eventData) {
     const eventCal = {
@@ -73,39 +67,30 @@ module.exports.updateEvent = function (eventData) {
             'timeZone': 'America/Los_Angeles',
         },
     };
-    return new Promise((resolve, reject) => {
-        gcal.events.update({
-            calendarId: CALENDAR_ID.value(),
-            eventId: `${eventData.id}`,
-            resource: eventCal,
-        }, function (err, event) {
-            if (err) {
-                logger.error('There was an error contacting the Calendar service: ', err)
-                logger.info('Event data was:', eventCal)
-                reject(err);
-                return;
-            }
-            logger.info('Event updated: ', event.data);
-            resolve(event.data);
-        });
+    
+    return gcal.events.update({
+        calendarId: CALENDAR_ID.value(),
+        eventId: `${eventData.id}`,
+        resource: eventCal,
+    }).then(event => {
+        logger.info('Event updated: ', event.data);
+        return event.data;
+    }).catch(err => {
+        logger.error('There was an error contacting the Calendar service: ', err);
+        logger.info('Event data was:', eventCal);
+        throw err;
     });
 }
 
-
 module.exports.deleteEvent = function (eventData) {
-    return new Promise((resolve, reject) => {
-        gcal.events.delete({
-            calendarId: CALENDAR_ID.value(),
-            eventId: `${eventData.id}`,
-        }, function (err, event) {
-            if (err) {
-                logger.error('There was an error contacting the Calendar service: ', err)
-                logger.info('Event data was:', eventData)
-                reject(err);
-                return;
-            }
-            logger.info('Event deleted: ', eventData);
-            resolve();
-        });
+    return gcal.events.delete({
+        calendarId: CALENDAR_ID.value(),
+        eventId: `${eventData.id}`,
+    }).then(() => {
+        logger.info('Event deleted: ', eventData);
+    }).catch(err => {
+        logger.error('There was an error contacting the Calendar service: ', err);
+        logger.info('Event data was:', eventData);
+        throw err;
     });
 }
