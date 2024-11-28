@@ -40,7 +40,6 @@ const fetchEvents = async (context) => {
             await batch.commit();
         }
 
-        // Delete events that no longer exist
         const idsToDelete = savedIds.filter(id => !processedIds.has(id));
         for (const id of idsToDelete) {
             await eventsCollection.doc(id).delete();
@@ -73,19 +72,40 @@ const fetchEventsWithoutCalendar = async (context) => {
     }
 };
 
-exports.eventChecker = onSchedule({ 
-    schedule: '0 0 * * *', 
-    timeoutSeconds: 300,
-    memory: '256MiB'
+// Function Configurations
+const functionConfig = {
+    memory: '256MiB',
+    region: 'us-central1',
+    minInstances: 0,
+    maxInstances: 1,
+    timeoutSeconds: 120
+};
+
+// Scheduled Functions
+exports.eventChecker = onSchedule({
+    ...functionConfig,
+    schedule: '0 0 * * *',
+    retryCount: 1,
+    labels: {
+        deployment: 'scheduled'
+    }
 }, fetchEvents);
 
-exports.eventWithoutCalenderChecker = onSchedule({ 
-    schedule: '0 12 * * *', 
-    timeoutSeconds: 300,
-    memory: '256MiB'
+
+exports.eventWithoutCalenderChecker = onSchedule({
+    ...functionConfig,
+    schedule: '0 12 * * *',
+    retryCount: 1,
+    labels: {
+        deployment: 'scheduled'
+    }
 }, fetchEventsWithoutCalendar);
 
-exports.databaseOnCreate = onDocumentCreated("events/{eventId}", async (event) => {
+// Firestore Trigger Functions
+exports.databaseOnCreate = onDocumentCreated({
+    ...functionConfig,
+    document: "events/{eventId}"
+}, async (event) => {
     try {
         const eventData = event.data.data();
         await createEvent(eventData);
@@ -94,10 +114,12 @@ exports.databaseOnCreate = onDocumentCreated("events/{eventId}", async (event) =
         logger.error('Error in databaseOnCreate:', error);
         await event.data.ref.update({ isAddedToCalendar: false });
     }
-    return null;
 });
 
-exports.databaseOnUpdate = onDocumentUpdated("events/{eventId}", async (event) => {
+exports.databaseOnUpdate = onDocumentUpdated({
+    ...functionConfig,
+    document: "events/{eventId}"
+}, async (event) => {
     try {
         if (event.data.before.data().isAddedToCalendar === false && 
             event.data.after.data().isAddedToCalendar === true) {
@@ -108,10 +130,12 @@ exports.databaseOnUpdate = onDocumentUpdated("events/{eventId}", async (event) =
         logger.error('Error in databaseOnUpdate:', error);
         await event.data.after.ref.update({ isAddedToCalendar: false });
     }
-    return null;
 });
 
-exports.databaseOnDelete = onDocumentDeleted("events/{eventId}", async (event) => {
+exports.databaseOnDelete = onDocumentDeleted({
+    ...functionConfig,
+    document: "events/{eventId}"
+}, async (event) => {
     try {
         const deletedData = event.data.data();
         if (deletedData.isAddedToCalendar === true) {
@@ -120,5 +144,4 @@ exports.databaseOnDelete = onDocumentDeleted("events/{eventId}", async (event) =
     } catch (error) {
         logger.error('Error in databaseOnDelete:', error);
     }
-    return null;
 });
