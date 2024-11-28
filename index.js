@@ -75,17 +75,27 @@ exports.databaseOnCreate = onDocumentCreated("events/{eventId}", async (event) =
     return null;
 })
 
-exports.databaseOnUpdate = onDocumentUpdated("events/{eventId}", (event) => {
+exports.databaseOnUpdate = onDocumentUpdated("events/{eventId}", async (event) => {
     if (event.data.before.data().isAddedToCalendar == false && event.data.after.data().isAddedToCalendar == true) {
         const newEventData = event.data.after.data();
-        updateEvent(newEventData);
+        try {
+            await updateEvent(newEventData);
+        } catch (error) {
+            logger.error('Failed to update calendar event:', error);
+            await event.data.after.ref.update({ isAddedToCalendar: false });
+        }
     }
     return null;
 })
 
-exports.databaseOnDelete = onDocumentDeleted("events/{eventId}", (event) => {
+exports.databaseOnDelete = onDocumentDeleted("events/{eventId}", async (event) => {
     const deletedData = event.data.data();
-    if (deletedData.isAddedToCalendar == true)
-        deleteEvent(deletedData);
+    if (deletedData.isAddedToCalendar == true) {
+        try {
+            await deleteEvent(deletedData);
+        } catch (error) {
+            logger.error('Failed to delete calendar event:', error);
+        }
+    }
     return null;
 })
